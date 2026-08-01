@@ -89,6 +89,7 @@ src/investigate.ts           the actual investigation logic, kept separate
                               from the MCP/transport layer so it's testable
                               on its own
 src/server.ts                MCP server, 3 tools, Streamable HTTP
+src/smoke-test.ts            reproducible hosted-protocol check — see below
 tests/investigate.test.ts    integration tests against a real Postgres DB
 ```
 
@@ -126,6 +127,24 @@ test data just aged out of the window it was meant to represent. Fixed by
 having the test suite seed that specific case fresh, immediately before
 asserting on it, instead of depending on `npm run seed` having been run
 recently.
+
+## Hosted-protocol smoke check
+
+The test suite above runs the investigation logic directly against Postgres.
+It doesn't prove the *deployed* MCP endpoint itself actually speaks the
+protocol correctly over the network. This script does — it initializes a
+real MCP session against a live URL, lists the tools, calls
+`investigate_payment_incident`, and writes the raw request/response pairs
+to `smoke-test-output.json` so the result is inspectable and reproducible,
+not just something I ran once and pasted into a chat.
+
+```bash
+MCP_URL="https://<your-app>.onrender.com/mcp" npm run smoke:hosted
+```
+
+Defaults to `http://localhost:3000/mcp` if `MCP_URL` isn't set. Exits
+non-zero if the deployed server doesn't respond as expected, so it can
+also be used as a basic post-deploy health check.
 
 ## Deploying (Render + Neon)
 
