@@ -10,6 +10,7 @@
     "dev": "tsx src/server.ts",
     "migrate": "tsx src/migrate.ts",
     "seed": "tsx src/seed.ts",
+    "smoke:hosted": "tsx src/smoke-test.ts",
     "test": "vitest run"
   },
   "dependencies": {

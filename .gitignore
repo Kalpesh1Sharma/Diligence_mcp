@@ -2,3 +2,5 @@ node_modules/
 dist/
 .env
 *.log
+demo_output_*.json
+smoke-test-output.json
