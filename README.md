@@ -139,7 +139,7 @@ to `smoke-test-output.json` so the result is inspectable and reproducible,
 not just something I ran once and pasted into a chat.
 
 ```bash
-MCP_URL="https://<your-app>.onrender.com/mcp" npm run smoke:hosted
+MCP_URL="https://diligence-mcp.onrender.com/mcp" npm run smoke:hosted
 ```
 
 Defaults to `http://localhost:3000/mcp` if `MCP_URL` isn't set. Exits
