@@ -111,7 +111,7 @@ export async function investigatePaymentIncident(
   const classification = "payment_captured_no_order";
   const confidence: "low" | "medium" | "high" = "high";
   const recommendedAction =
-    "Manually verify with the payment provider that funds were captured, then recreate the order for this checkout_reference or initiate a refund if the customer no longer wants the order.";
+    "Manually verify with the payment provider that funds were captured. If confirmed, review whether manual order recreation is appropriate under current operational policy. If the customer no longer wants the order, follow the organization's refund process.";
 
   
   const upsertRes = await pool.query<{ id: string; created_at: string; updated_at: string }>(
