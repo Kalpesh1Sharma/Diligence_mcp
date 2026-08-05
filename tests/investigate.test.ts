@@ -1,14 +1,22 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { pool } from "../src/db.js";
+import type { Pool } from "pg";
+import { setupTestDatabase, teardownTestDatabase } from "./testDb.js";
 import { investigatePaymentIncident, getEscalationStatus, listOpenEscalations } from "../src/investigate.js";
 
-
+// This suite is self-contained: setupTestDatabase() launches a real,
+// ephemeral Postgres container (via Testcontainers) and applies the actual
+// migration file, so no reviewer needs their own DATABASE_URL, Neon
+// account, or manual Postgres setup — only a running Docker daemon.
+//
+// The "within buffer window" scenario is inherently time-relative —
+// captured_at is set to "1 minute ago" relative to *now*, right before the
+// assertion runs, so there's no gap for it to decay into a false "buffer
+// elapsed" result if the test run is delayed.
+let pool: Pool;
 let customerId: string;
 
 beforeAll(async () => {
-  await pool.query(
-    `TRUNCATE incident_escalations, orders, payments, customers RESTART IDENTITY CASCADE`
-  );
+  pool = await setupTestDatabase();
 
   const { rows } = await pool.query<{ id: string }>(
     `INSERT INTO customers (email, name) VALUES ('test@example.com', 'Test Customer') RETURNING id`
@@ -27,11 +35,11 @@ beforeAll(async () => {
     `INSERT INTO orders (customer_id, checkout_reference, status) VALUES ($1, 'chk_healthy_002', 'created')`,
     [customerId]
   );
-});
+}, 60_000); // container startup can take a while on first run (image pull)
 
 describe("investigatePaymentIncident", () => {
   afterAll(async () => {
-    await pool.end();
+    await teardownTestDatabase();
   });
 
   it("confirms an incident when payment is captured, buffer elapsed, and no order exists", async () => {
@@ -50,7 +58,6 @@ describe("investigatePaymentIncident", () => {
   });
 
   it("is not eligible when still within the buffer window", async () => {
-    
     await pool.query(
       `INSERT INTO payments (customer_id, checkout_reference, payment_reference, amount, currency, status, provider, captured_at)
        VALUES ($1, 'chk_buffer_003', 'pay_ref_003', 899.00, 'INR', 'captured', 'stripe', now() - interval '1 minute')`,
@@ -84,7 +91,6 @@ describe("investigatePaymentIncident", () => {
     expect(second.status).toBe("incident_confirmed");
     if (second.status === "incident_confirmed") {
       expect(second.wasDuplicate).toBe(true);
-      
       if (first.status === "incident_confirmed") {
         expect(second.escalationId).toBe(first.escalationId);
       }
@@ -97,7 +103,6 @@ describe("investigatePaymentIncident", () => {
   });
 
   it("enforces the dedup guarantee even under concurrent investigations", async () => {
-   
     await Promise.all(
       Array.from({ length: 10 }, () => investigatePaymentIncident(pool, "chk_incident_001"))
     );
@@ -108,7 +113,6 @@ describe("investigatePaymentIncident", () => {
   });
 
   it("auto-resolves a previously open escalation once an order appears", async () => {
-    
     await pool.query(
       `INSERT INTO customers (email, name) VALUES ('late@example.com', 'Late Order Customer') RETURNING id`
     );
@@ -140,6 +144,6 @@ describe("investigatePaymentIncident", () => {
     const open = await listOpenEscalations(pool, 50);
     const refs = open.map((r: any) => r.checkout_reference);
     expect(refs).toContain("chk_incident_001");
-    expect(refs).not.toContain("chk_late_order_005"); 
+    expect(refs).not.toContain("chk_late_order_005");
   });
 });

@@ -113,20 +113,33 @@ npm run dev              # server on :3000
 npm test
 ```
 
+Needs Docker running locally — the suite uses
+[Testcontainers](https://node.testcontainers.org/) to spin up a real,
+throwaway Postgres container, apply the actual migration file against it,
+run everything, and tear it down afterward. No `DATABASE_URL`, no Neon
+account, nothing to configure by hand — `npm install && npm test` is meant
+to just work for anyone reviewing this, with Docker as the only
+prerequisite. (Neon is only used for the actual deployed server, not for
+running these tests.) First run is a bit slower while Docker pulls the
+`postgres:16-alpine` image; after that it's cached and fast.
+
 Nine tests, all against a real database rather than mocks: the four seed
 scenarios, re-investigating an incident updates the existing escalation
 instead of duplicating it, an escalation auto-resolves once a delayed order
 shows up, and the concurrency test mentioned above.
 
-One thing I caught while running these against Neon: the "within buffer
-window" scenario is inherently time-relative (it depends on how long ago
-the payment was seeded), so if you run `seed` and then run the tests
-several minutes later, that scenario can quietly become stale and the test
-fails — correctly, because the underlying behavior is actually right, the
-test data just aged out of the window it was meant to represent. Fixed by
+One thing I caught while running these against Neon, back when the suite
+depended on an external database: the "within buffer window" scenario is
+inherently time-relative (it depends on how long ago the payment was
+seeded), so if you ran `seed` and then ran the tests several minutes later,
+that scenario could quietly become stale and the test would fail —
+correctly, because the underlying behavior was actually right, the test
+data just aged out of the window it was meant to represent. Fixed by
 having the test suite seed that specific case fresh, immediately before
-asserting on it, instead of depending on `npm run seed` having been run
-recently.
+asserting on it, rather than depending on external seed timing at all —
+which is part of why moving to a self-contained per-run database (instead
+of a shared external one) made the suite more reliable, not just more
+reviewer-friendly.
 
 ## Hosted-protocol smoke check
 
@@ -139,7 +152,7 @@ to `smoke-test-output.json` so the result is inspectable and reproducible,
 not just something I ran once and pasted into a chat.
 
 ```bash
-MCP_URL="https://<your-app>.onrender.com/mcp" npm run smoke:hosted
+MCP_URL="https://diligence-mcp.onrender.com/mcp" npm run smoke:hosted
 ```
 
 Defaults to `http://localhost:3000/mcp` if `MCP_URL` isn't set. Exits
